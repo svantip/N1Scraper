@@ -1,7 +1,0 @@
-
-INFO:__main__:Started
-INFO:__main__:Fetching articles from page 1...
-INFO:__main__:API URL: https://n1info.hr/wp-json/wp/v2/uc-all-posts, Parameters: {'per_page': 10, 'page': 1}
-INFO:__main__:Stopping the loop as article datetime is older than or equal to last scraped datetime.
-INFO:__main__:Processing and saving the scraped articles...
-INFO:__main__:Articles data successfully written to JSON files.
