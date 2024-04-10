@@ -1,11 +1,13 @@
-import os
 import datetime
-from bs4 import BeautifulSoup
-import requests
-from newspaper import Article
 import json
 import logging
+import os
 from datetime import datetime
+
+import psycopg2
+import requests
+from bs4 import BeautifulSoup
+from newspaper import Article
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(filename='scraper.log', level=logging.INFO)
@@ -17,6 +19,30 @@ base_url = "https://n1info.hr/wp-json/wp/v2/uc-all-posts"
 params = {
     'per_page': 10
 }
+
+connection = psycopg2.connect(user="svan1233",
+                              password="tockica184",
+                              host="localhost",
+                              port="5432",
+                              database="N1articles")
+
+
+def save_to_database(article_list):
+    try:
+        cursor = connection.cursor()
+        for article in article_list:
+            postgres_insert_query = """ INSERT INTO articles (article_id, title, date, time, hashtags, text, source, category) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)"""
+            record_to_insert = (article.article_id, article.title, article.date, article.time,
+                                article.hashtags, article.text, article.source, article.category)
+            cursor.execute(postgres_insert_query, record_to_insert)
+            connection.commit()
+        logger.info(
+            "Records inserted successfully into articles table")
+    except (Exception, psycopg2.Error) as error:
+        logger.error(f"Failed to insert record into articles table: {error}")
+    finally:
+        if connection:
+            cursor.close()
 
 
 class N1Article:
@@ -49,15 +75,19 @@ class N1Article:
 def load_last_scraped_datetime():
     try:
         with open("last_scraped_datetime.txt", "r") as file:
-            last_scraped_datetime_str = file.read().strip()
-            return datetime.datetime.fromisoformat(last_scraped_datetime_str)
+            datetime_str = file.read().strip()
+            return datetime.fromisoformat(datetime_str)
     except FileNotFoundError:
         return None
 
 
 def save_last_scraped_datetime(last_scraped_datetime):
-    with open("last_scraped_datetime.txt", "w") as file:
-        file.write(last_scraped_datetime.isoformat())
+    try:
+        with open("last_scraped_datetime.txt", "w") as file:
+            file.write(last_scraped_datetime.isoformat())
+        logger.info("Last scraped datetime saved successfully.")
+    except Exception as e:
+        logger.info("Error saving last scraped datetime:", e)
 
 
 def create_directory_if_not_exists(directory):
@@ -78,13 +108,15 @@ def collect_articles_from_api(base_url, params, last_scraped_datetime):
 
         if response.status_code == 200:
             data = response.json()
-            if not data:
+            if not data:  # No more articles available
                 logger.info("No more articles available.")
                 break
 
             for article_data in data['data']:
-                article_datetime = datetime.datetime.strptime(
+                article_datetime = datetime.strptime(
                     article_data.get('date_unparsed', ''), "%Y-%m-%d %H:%M:%S")
+                logger.info(
+                    f"Article datetime: {article_datetime}, Last scraped datetime: {last_scraped_datetime}")
                 if last_scraped_datetime and article_datetime <= last_scraped_datetime:
                     should_stop = True
                     logger.info(
@@ -111,16 +143,20 @@ def collect_articles_from_api(base_url, params, last_scraped_datetime):
 
 
 def get_text_from_article(article_source):
-    article = Article(article_source, language="hr")
-    article.download()
-    article.parse()
-    text = article.text
+    try:
+        article = Article(article_source, language="hr")
+        article.download()
+        article.parse()
+        text = article.text
 
-    modified_text = text.replace(
-        'N1 pratite putem aplikacija za Android | iPhone/iPad i mreža Twitter | Facebook | Instagram | TikTok.', '')
-    modified_text = modified_text.replace('Podijeli :', '')
-    modified_text = modified_text.replace('\n', ' ')
-    return modified_text
+        modified_text = text.replace(
+            'N1 pratite putem aplikacija za Android | iPhone/iPad i mreža Twitter | Facebook | Instagram | TikTok.', '')
+        modified_text = modified_text.replace('Podijeli :', '')
+        modified_text = modified_text.replace('\n', ' ')
+        return modified_text
+    except Exception as e:
+        print(f"Error occurred while parsing article: {e}")
+        return ""
 
 
 def get_tags_from_article(article_source):
@@ -148,18 +184,23 @@ article_list = collect_articles_from_api(
     base_url, params, last_scraped_datetime)
 
 if article_list:
+    last_article_datetime = article_list[0].date + " " + article_list[0].time
+    save_last_scraped_datetime(datetime.strptime(
+        last_article_datetime, "%Y-%m-%d %H:%M"))
+
     logger.info("Processing and saving the scraped articles...")
     scrape_each_article(article_list)
+    save_to_database(article_list)
     for article in article_list:
         directory = os.path.join("data", article.date)
         create_directory_if_not_exists(directory)
         file_name = f"{article.article_id}.json"
         file_path = os.path.join(directory, file_name)
         with open(file_path, "w", encoding="utf-8") as file:
-            json.dump(article.to_dict(), file, ensure_ascii=False, indent=4)
+            json.dump(article.to_dict(), file,
+                      ensure_ascii=False, indent=4)
+    logger.info("Articles data successfully written to JSON file.")
+else:
+    logger.info("No articles fetched from the API.")
 
-    last_article_datetime = article_list[0].date + " " + article_list[0].time
-    save_last_scraped_datetime(datetime.datetime.strptime(
-        last_article_datetime, "%Y-%m-%d %H:%M"))
-
-logger.info("Articles data successfully written to JSON files.")
+connection.close()
