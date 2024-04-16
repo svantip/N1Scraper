@@ -1,8 +1,5 @@
 data/
 
-# Ignore IDE-specific files
-.idea/
 .vscode/
 
-# Ignore log files
-*.log
+scraper.log
