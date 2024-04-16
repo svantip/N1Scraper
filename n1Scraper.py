@@ -2,6 +2,7 @@ import datetime
 import json
 import logging
 import os
+import re
 from datetime import datetime
 
 import psycopg2
@@ -153,9 +154,26 @@ def get_text_from_article(article_source):
             'N1 pratite putem aplikacija za Android | iPhone/iPad i mreža Twitter | Facebook | Instagram | TikTok.', '')
         modified_text = modified_text.replace('Podijeli :', '')
         modified_text = modified_text.replace('\n', ' ')
+
+        # regex pattern for word or two words, followed by / and then another word
+        pattern = r'\b\S+\s?\S*\/\S+\b'
+        modified_text = re.sub(pattern, '', modified_text)
+        # regex pattern for the string containing capital letters, spaces, and other characters, followed by / and then another sequence of characters
+        pattern = r'\b[\w\s]+\s?\/\s?\w+\b'
+        modified_text = re.sub(pattern, '', modified_text)
+        pattern = r'\b.+?\s?\/\s?.+?\b'
+        modified_text = re.sub(pattern, '', modified_text)
+        # regex for word then space then via REUTERS prefixes
+        pattern = r'\b\w+\s+via\s+REUTERS\b'
+        modified_text = re.sub(pattern, '', modified_text)
+
+        modified_text = modified_text.replace('Pexels', '')
+        modified_text = modified_text.replace('N1', '')
+        modified_text = modified_text.replace('via REUTERS', '')
+        modified_text = modified_text.replace('/', '')
         return modified_text
     except Exception as e:
-        print(f"Error occurred while parsing article: {e}")
+        logger.error(f"Error occurred while parsing article: {e}")
         return ""
 
 
@@ -192,13 +210,14 @@ if article_list:
     scrape_each_article(article_list)
     save_to_database(article_list)
     for article in article_list:
-        directory = os.path.join("data", article.date)
-        create_directory_if_not_exists(directory)
-        file_name = f"{article.article_id}.json"
-        file_path = os.path.join(directory, file_name)
-        with open(file_path, "w", encoding="utf-8") as file:
-            json.dump(article.to_dict(), file,
-                      ensure_ascii=False, indent=4)
+        if article.text != "" and article.category != "N1 Studio uživo":
+            directory = os.path.join("data", article.date)
+            create_directory_if_not_exists(directory)
+            file_name = f"{article.article_id}.json"
+            file_path = os.path.join(directory, file_name)
+            with open(file_path, "w", encoding="utf-8") as file:
+                json.dump(article.to_dict(), file,
+                          ensure_ascii=False, indent=4)
     logger.info("Articles data successfully written to JSON file.")
 else:
     logger.info("No articles fetched from the API.")
