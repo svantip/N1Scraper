@@ -1,5 +1,4 @@
 data/
-
+data_temp/
+_pycache_/
 .vscode/
-
-scraper.log

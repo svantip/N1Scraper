@@ -3,15 +3,15 @@ import json
 import logging
 import os
 import re
+import sqlite3
 from datetime import datetime
 
-import psycopg2
 import requests
 from bs4 import BeautifulSoup
 from newspaper import Article
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(filename='scraper.log', level=logging.INFO)
+logging.basicConfig(filename='../data/scraper.log', level=logging.INFO)
 now = datetime.now()
 logger.info('Started scraper at {}'.format(now.strftime("%H:%M:%S %d/%m/%Y")))
 
@@ -21,29 +21,22 @@ params = {
     'per_page': 10
 }
 
-connection = psycopg2.connect(user="svan1233",
-                              password="tockica184",
-                              host="localhost",
-                              port="5432",
-                              database="N1articles")
-
 
 def save_to_database(article_list):
-    try:
-        cursor = connection.cursor()
-        for article in article_list:
-            postgres_insert_query = """ INSERT INTO articles (article_id, title, date, time, hashtags, text, source, category) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)"""
+    connection = sqlite3.connect('../data/articles.db')
+    cursor = connection.cursor()
+    for article in article_list:
+        try:
+            sqlite_insert_query = """INSERT INTO articles (article_id, title, date, time, hashtags, text, source, category) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"""
             record_to_insert = (article.article_id, article.title, article.date, article.time,
-                                article.hashtags, article.text, article.source, article.category)
-            cursor.execute(postgres_insert_query, record_to_insert)
+                                json.dumps(article.hashtags), article.text, article.source, article.category)
+            cursor.execute(sqlite_insert_query, record_to_insert)
             connection.commit()
-        logger.info(
-            "Records inserted successfully into articles table")
-    except (Exception, psycopg2.Error) as error:
-        logger.error(f"Failed to insert record into articles table: {error}")
-    finally:
-        if connection:
-            cursor.close()
+        except sqlite3.Error as error:
+            logger.error(
+                f"Failed to insert record into articles table: {error}")
+    cursor.close()
+    connection.close()
 
 
 class N1Article:
@@ -75,7 +68,7 @@ class N1Article:
 
 def load_last_scraped_datetime():
     try:
-        with open("last_scraped_datetime.txt", "r") as file:
+        with open("../data/last_scraped_datetime.txt", "r") as file:
             datetime_str = file.read().strip()
             return datetime.fromisoformat(datetime_str)
     except FileNotFoundError:
@@ -84,7 +77,7 @@ def load_last_scraped_datetime():
 
 def save_last_scraped_datetime(last_scraped_datetime):
     try:
-        with open("last_scraped_datetime.txt", "w") as file:
+        with open("../data/last_scraped_datetime.txt", "w") as file:
             file.write(last_scraped_datetime.isoformat())
         logger.info("Last scraped datetime saved successfully.")
     except Exception as e:
@@ -116,8 +109,6 @@ def collect_articles_from_api(base_url, params, last_scraped_datetime):
             for article_data in data['data']:
                 article_datetime = datetime.strptime(
                     article_data.get('date_unparsed', ''), "%Y-%m-%d %H:%M:%S")
-                logger.info(
-                    f"Article datetime: {article_datetime}, Last scraped datetime: {last_scraped_datetime}")
                 if last_scraped_datetime and article_datetime <= last_scraped_datetime:
                     should_stop = True
                     logger.info(
@@ -200,7 +191,7 @@ last_scraped_datetime = load_last_scraped_datetime()
 
 article_list = collect_articles_from_api(
     base_url, params, last_scraped_datetime)
-
+print(len(article_list))
 if article_list:
     last_article_datetime = article_list[0].date + " " + article_list[0].time
     save_last_scraped_datetime(datetime.strptime(
@@ -211,7 +202,7 @@ if article_list:
     save_to_database(article_list)
     for article in article_list:
         if article.text != "" and article.category != "N1 Studio uživo":
-            directory = os.path.join("data", article.date)
+            directory = os.path.join("../data_temp", article.date)
             create_directory_if_not_exists(directory)
             file_name = f"{article.article_id}.json"
             file_path = os.path.join(directory, file_name)
@@ -221,5 +212,3 @@ if article_list:
     logger.info("Articles data successfully written to JSON file.")
 else:
     logger.info("No articles fetched from the API.")
-
-connection.close()
