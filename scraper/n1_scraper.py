@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import json
 import logging
@@ -5,8 +6,10 @@ import os
 import re
 import sqlite3
 from datetime import datetime
+from time import sleep
 
 import requests
+import tqdm
 from bs4 import BeautifulSoup
 from newspaper import Article
 
@@ -25,7 +28,7 @@ params = {
 def save_to_database(article_list):
     connection = sqlite3.connect('../data/articles.db')
     cursor = connection.cursor()
-    for article in article_list:
+    for article in tqdm.tqdm(article_list, desc="Saving to database..."):
         try:
             sqlite_insert_query = """INSERT INTO articles (article_id, title, date, time, hashtags, text, source, category) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"""
             record_to_insert = (article.article_id, article.title, article.date, article.time,
@@ -125,10 +128,10 @@ def collect_articles_from_api(base_url, params, last_scraped_datetime):
                 article = N1Article(article_id=article_id, title=title,
                                     date=date, time=time, source=link, category=category)
                 articles_list.append(article)
+
         else:
             logger.error(
                 f"Failed to fetch page {page_number}: Status code {response.status_code}")
-
         page_number += 1
 
     return articles_list
@@ -136,28 +139,25 @@ def collect_articles_from_api(base_url, params, last_scraped_datetime):
 
 def get_text_from_article(article_source):
     try:
+        # Using article object to parse the page content
         article = Article(article_source, language="hr")
         article.download()
         article.parse()
         text = article.text
 
+        # Processing the text so that it leaves only raw data
         modified_text = text.replace(
             'N1 pratite putem aplikacija za Android | iPhone/iPad i mreža Twitter | Facebook | Instagram | TikTok.', '')
         modified_text = modified_text.replace('Podijeli :', '')
         modified_text = modified_text.replace('\n', ' ')
-
-        # regex pattern for word or two words, followed by / and then another word
         pattern = r'\b\S+\s?\S*\/\S+\b'
         modified_text = re.sub(pattern, '', modified_text)
-        # regex pattern for the string containing capital letters, spaces, and other characters, followed by / and then another sequence of characters
         pattern = r'\b[\w\s]+\s?\/\s?\w+\b'
         modified_text = re.sub(pattern, '', modified_text)
         pattern = r'\b.+?\s?\/\s?.+?\b'
         modified_text = re.sub(pattern, '', modified_text)
-        # regex for word then space then via REUTERS prefixes
         pattern = r'\b\w+\s+via\s+REUTERS\b'
         modified_text = re.sub(pattern, '', modified_text)
-
         modified_text = modified_text.replace('Pexels', '')
         modified_text = modified_text.replace('N1', '')
         modified_text = modified_text.replace('via REUTERS', '')
@@ -179,7 +179,7 @@ def get_tags_from_article(article_source):
 
 
 def scrape_each_article(article_list):
-    for article in article_list:
+    for article in tqdm.tqdm(article_list, desc="Scraping Articles"):
         article_source = article.source
         text = get_text_from_article(article_source)
         tags = get_tags_from_article(article_source)
@@ -188,10 +188,10 @@ def scrape_each_article(article_list):
 
 
 last_scraped_datetime = load_last_scraped_datetime()
-
+print("Starting scraper...                                   ", end="\r")
 article_list = collect_articles_from_api(
     base_url, params, last_scraped_datetime)
-print(len(article_list))
+
 if article_list:
     last_article_datetime = article_list[0].date + " " + article_list[0].time
     save_last_scraped_datetime(datetime.strptime(
@@ -200,7 +200,7 @@ if article_list:
     logger.info("Processing and saving the scraped articles...")
     scrape_each_article(article_list)
     save_to_database(article_list)
-    for article in article_list:
+    for article in tqdm.tqdm(article_list, desc="Saving to directory..."):
         if article.text != "" and article.category != "N1 Studio uživo":
             directory = os.path.join("../data_temp", article.date)
             create_directory_if_not_exists(directory)

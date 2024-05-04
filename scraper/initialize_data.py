@@ -73,6 +73,6 @@ save_last_scraped_datetime(last_scraped_datetime)
 
 # Run scraper
 python_executable = sys.executable
-print("This may take a few minutes...")
+print("This may take a few minutes...", end="\r")
 subprocess.run([python_executable, 'n1_scraper.py'])
 print("Finished!", end="\r")
