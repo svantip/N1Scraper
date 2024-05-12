@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import json
 import logging
@@ -5,8 +6,10 @@ import os
 import re
 import sqlite3
 from datetime import datetime
+from time import sleep
 
 import requests
+import tqdm
 from bs4 import BeautifulSoup
 from newspaper import Article
 
@@ -25,18 +28,19 @@ params = {
 def save_to_database(article_list):
     connection = sqlite3.connect('../data/articles.db')
     cursor = connection.cursor()
-    for article in article_list:
-        try:
-            sqlite_insert_query = """INSERT INTO articles (article_id, title, date, time, hashtags, text, source, category) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"""
-            record_to_insert = (article.article_id, article.title, article.date, article.time,
-                                json.dumps(article.hashtags), article.text, article.source, article.category)
-            cursor.execute(sqlite_insert_query, record_to_insert)
-            connection.commit()
-        except sqlite3.Error as error:
-            logger.error(
-                f"Failed to insert record into articles table: {error}")
-    cursor.close()
-    connection.close()
+
+    try:
+        sqlite_insert_query = """INSERT INTO articles (article_id, title, date, time, hashtags, text, source, category) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"""
+        records_to_insert = [(article.article_id, article.title, article.date, article.time,
+                              json.dumps(article.hashtags), article.text, article.source, article.category) for article in article_list]
+
+        cursor.executemany(sqlite_insert_query, records_to_insert)
+        connection.commit()
+    except sqlite3.Error as error:
+        logger.error(f"Failed to insert records into articles table: {error}")
+    finally:
+        cursor.close()
+        connection.close()
 
 
 class N1Article:
@@ -125,10 +129,10 @@ def collect_articles_from_api(base_url, params, last_scraped_datetime):
                 article = N1Article(article_id=article_id, title=title,
                                     date=date, time=time, source=link, category=category)
                 articles_list.append(article)
+
         else:
             logger.error(
                 f"Failed to fetch page {page_number}: Status code {response.status_code}")
-
         page_number += 1
 
     return articles_list
@@ -136,28 +140,25 @@ def collect_articles_from_api(base_url, params, last_scraped_datetime):
 
 def get_text_from_article(article_source):
     try:
+        # Using article object to parse the page content
         article = Article(article_source, language="hr")
         article.download()
         article.parse()
         text = article.text
 
+        # Processing the text so that it leaves only raw data
         modified_text = text.replace(
             'N1 pratite putem aplikacija za Android | iPhone/iPad i mreža Twitter | Facebook | Instagram | TikTok.', '')
         modified_text = modified_text.replace('Podijeli :', '')
         modified_text = modified_text.replace('\n', ' ')
-
-        # regex pattern for word or two words, followed by / and then another word
         pattern = r'\b\S+\s?\S*\/\S+\b'
         modified_text = re.sub(pattern, '', modified_text)
-        # regex pattern for the string containing capital letters, spaces, and other characters, followed by / and then another sequence of characters
         pattern = r'\b[\w\s]+\s?\/\s?\w+\b'
         modified_text = re.sub(pattern, '', modified_text)
         pattern = r'\b.+?\s?\/\s?.+?\b'
         modified_text = re.sub(pattern, '', modified_text)
-        # regex for word then space then via REUTERS prefixes
         pattern = r'\b\w+\s+via\s+REUTERS\b'
         modified_text = re.sub(pattern, '', modified_text)
-
         modified_text = modified_text.replace('Pexels', '')
         modified_text = modified_text.replace('N1', '')
         modified_text = modified_text.replace('via REUTERS', '')
@@ -179,7 +180,7 @@ def get_tags_from_article(article_source):
 
 
 def scrape_each_article(article_list):
-    for article in article_list:
+    for article in tqdm.tqdm(article_list, desc="Scraping Articles"):
         article_source = article.source
         text = get_text_from_article(article_source)
         tags = get_tags_from_article(article_source)
@@ -187,11 +188,66 @@ def scrape_each_article(article_list):
         article.hashtags = tags
 
 
+def load_ids():
+    connection = sqlite3.connect('../data/articles.db')
+    cursor = connection.cursor()
+    try:
+        query = "SELECT article_id FROM articles"
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        id_dict = {}
+        for row in rows:
+            article_id = row[0]
+            id_dict[article_id] = None
+        # If the database is empty, initialize with article IDs from the API
+        if not id_dict:
+            for article in article_list:
+                id_dict[article.article_id] = None
+        return id_dict
+    finally:
+        cursor.close()
+        connection.close()
+
+
+try:
+    with open('../data/duplicates.json', 'r') as file:
+        duplicates = json.load(file)
+except:
+    duplicates = {}
+
 last_scraped_datetime = load_last_scraped_datetime()
+
+print("Starting scraper...                                   ", end="\r")
 
 article_list = collect_articles_from_api(
     base_url, params, last_scraped_datetime)
-print(len(article_list))
+
+ids = load_ids()
+
+for article in article_list:
+    if article.article_id in ids:
+        if article.article_id in duplicates:
+            counter = duplicates[article.article_id] + 1
+            article.article_id += ("-" + str(counter))
+            a_id = article.article_id.split("-")[0]
+            duplicates[a_id] = counter
+        else:
+            duplicates[article.article_id] = 1
+            article.article_id += "-1"
+
+
+data_dir = os.path.abspath(os.path.join(
+    os.path.dirname(__file__), '..', 'data'))
+file_path = os.path.join(data_dir, 'duplicates.json')
+
+try:
+    with open(file_path, 'w') as file:
+        json.dump(duplicates, file, ensure_ascii=False, indent=4)
+    logger.info(
+        "Duplicates data has been successfully written to 'duplicates.json'.")
+except Exception as e:
+    logger.info(f"An error occurred while writing to 'duplicates.json': {e}")
+
 if article_list:
     last_article_datetime = article_list[0].date + " " + article_list[0].time
     save_last_scraped_datetime(datetime.strptime(
@@ -200,7 +256,7 @@ if article_list:
     logger.info("Processing and saving the scraped articles...")
     scrape_each_article(article_list)
     save_to_database(article_list)
-    for article in article_list:
+    for article in tqdm.tqdm(article_list, desc="Saving to directory..."):
         if article.text != "" and article.category != "N1 Studio uživo":
             directory = os.path.join("../data_temp", article.date)
             create_directory_if_not_exists(directory)

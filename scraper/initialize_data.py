@@ -44,7 +44,7 @@ except sqlite3.Error as error:
 
 try:
     sqlite_create_table_query = """CREATE TABLE IF NOT EXISTS articles (
-            article_id INTEGER PRIMARY KEY, -- No AUTOINCREMENT
+            article_id TEXT PRIMARY KEY, -- No AUTOINCREMENT
             title TEXT,
             date DATE,
             time TIME,
@@ -71,8 +71,13 @@ last_scraped_datetime = previous_two_days_datetime
 logger.info(datetime.datetime.isoformat(last_scraped_datetime))
 save_last_scraped_datetime(last_scraped_datetime)
 
+file_path = '../data/duplicates.json'
+
+with open(file_path, 'w') as file:
+    file.truncate(0)
+
 # Run scraper
 python_executable = sys.executable
-print("This may take a few minutes...")
+print("This may take a few minutes...", end="\r")
 subprocess.run([python_executable, 'n1_scraper.py'])
 print("Finished!", end="\r")
