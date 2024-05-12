@@ -43,6 +43,11 @@ def delete_articles_from_database():
             print("PostgreSQL connection is closed.")
 
 
+file_path = '../data/duplicates.json'
+
+with open(file_path, 'w') as file:
+    file.truncate(0)
+
 delete_folders()
 delete_articles_from_database()
 delete_log()

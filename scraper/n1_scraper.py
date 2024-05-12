@@ -28,18 +28,19 @@ params = {
 def save_to_database(article_list):
     connection = sqlite3.connect('../data/articles.db')
     cursor = connection.cursor()
-    for article in tqdm.tqdm(article_list, desc="Saving to database..."):
-        try:
-            sqlite_insert_query = """INSERT INTO articles (article_id, title, date, time, hashtags, text, source, category) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"""
-            record_to_insert = (article.article_id, article.title, article.date, article.time,
-                                json.dumps(article.hashtags), article.text, article.source, article.category)
-            cursor.execute(sqlite_insert_query, record_to_insert)
-            connection.commit()
-        except sqlite3.Error as error:
-            logger.error(
-                f"Failed to insert record into articles table: {error}")
-    cursor.close()
-    connection.close()
+
+    try:
+        sqlite_insert_query = """INSERT INTO articles (article_id, title, date, time, hashtags, text, source, category) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"""
+        records_to_insert = [(article.article_id, article.title, article.date, article.time,
+                              json.dumps(article.hashtags), article.text, article.source, article.category) for article in article_list]
+
+        cursor.executemany(sqlite_insert_query, records_to_insert)
+        connection.commit()
+    except sqlite3.Error as error:
+        logger.error(f"Failed to insert records into articles table: {error}")
+    finally:
+        cursor.close()
+        connection.close()
 
 
 class N1Article:
@@ -187,10 +188,65 @@ def scrape_each_article(article_list):
         article.hashtags = tags
 
 
+def load_ids():
+    connection = sqlite3.connect('../data/articles.db')
+    cursor = connection.cursor()
+    try:
+        query = "SELECT article_id FROM articles"
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        id_dict = {}
+        for row in rows:
+            article_id = row[0]
+            id_dict[article_id] = None
+        # If the database is empty, initialize with article IDs from the API
+        if not id_dict:
+            for article in article_list:
+                id_dict[article.article_id] = None
+        return id_dict
+    finally:
+        cursor.close()
+        connection.close()
+
+
+try:
+    with open('../data/duplicates.json', 'r') as file:
+        duplicates = json.load(file)
+except:
+    duplicates = {}
+
 last_scraped_datetime = load_last_scraped_datetime()
+
 print("Starting scraper...                                   ", end="\r")
+
 article_list = collect_articles_from_api(
     base_url, params, last_scraped_datetime)
+
+ids = load_ids()
+
+for article in article_list:
+    if article.article_id in ids:
+        if article.article_id in duplicates:
+            counter = duplicates[article.article_id] + 1
+            article.article_id += ("-" + str(counter))
+            a_id = article.article_id.split("-")[0]
+            duplicates[a_id] = counter
+        else:
+            duplicates[article.article_id] = 1
+            article.article_id += "-1"
+
+
+data_dir = os.path.abspath(os.path.join(
+    os.path.dirname(__file__), '..', 'data'))
+file_path = os.path.join(data_dir, 'duplicates.json')
+
+try:
+    with open(file_path, 'w') as file:
+        json.dump(duplicates, file, ensure_ascii=False, indent=4)
+    logger.info(
+        "Duplicates data has been successfully written to 'duplicates.json'.")
+except Exception as e:
+    logger.info(f"An error occurred while writing to 'duplicates.json': {e}")
 
 if article_list:
     last_article_datetime = article_list[0].date + " " + article_list[0].time
