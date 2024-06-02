@@ -2,11 +2,11 @@ name: Script run test
 run-name: ${{ github.actor }} is testing out GitHub Actions 🚀
 on:
   schedule:
-    - cron: '45 21 * * *'
+    - cron: '49 21 * * *'
 jobs:
   Explore-GitHub-Actions:
     runs-on: ubuntu-latest
     steps:
       - name: Run scraper script
-        run: python scraper.py
+        run: python scraper/n1_scraper.py
       - run: echo "This job's status is ${{ job.status }}."
