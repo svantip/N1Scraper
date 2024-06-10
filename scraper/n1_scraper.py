@@ -13,8 +13,13 @@ import tqdm
 from bs4 import BeautifulSoup
 from newspaper import Article
 
+# Ensure the script uses the correct working directory
+current_dir = os.path.dirname(os.path.abspath(__file__))
+data_dir = os.path.join(current_dir, '../data')
+
 logger = logging.getLogger(__name__)
-logging.basicConfig(filename='../data/scraper.log', level=logging.INFO)
+logging.basicConfig(filename=os.path.join(
+    data_dir, 'scraper.log'), level=logging.INFO)
 now = datetime.now()
 logger.info('Started scraper at {}'.format(now.strftime("%H:%M:%S %d/%m/%Y")))
 
@@ -26,7 +31,7 @@ params = {
 
 
 def save_to_database(article_list):
-    connection = sqlite3.connect('../data/articles.db')
+    connection = sqlite3.connect(os.path.join(data_dir, 'articles.db'))
     cursor = connection.cursor()
 
     try:
@@ -72,7 +77,7 @@ class N1Article:
 
 def load_last_scraped_datetime():
     try:
-        with open("../data/last_scraped_datetime.txt", "r") as file:
+        with open(os.path.join(data_dir, 'last_scraped_datetime.txt'), "r") as file:
             datetime_str = file.read().strip()
             return datetime.fromisoformat(datetime_str)
     except FileNotFoundError:
@@ -81,7 +86,7 @@ def load_last_scraped_datetime():
 
 def save_last_scraped_datetime(last_scraped_datetime):
     try:
-        with open("../data/last_scraped_datetime.txt", "w") as file:
+        with open(os.path.join(data_dir, 'last_scraped_datetime.txt'), "w") as file:
             file.write(last_scraped_datetime.isoformat())
         logger.info("Last scraped datetime saved successfully.")
     except Exception as e:
@@ -189,7 +194,7 @@ def scrape_each_article(article_list):
 
 
 def load_ids():
-    connection = sqlite3.connect('../data/articles.db')
+    connection = sqlite3.connect(os.path.join(data_dir, 'articles.db'))
     cursor = connection.cursor()
     try:
         query = "SELECT article_id FROM articles"
@@ -210,7 +215,7 @@ def load_ids():
 
 
 try:
-    with open('../data/duplicates.json', 'r') as file:
+    with open(os.path.join(data_dir, 'duplicates.json'), 'r') as file:
         duplicates = json.load(file)
 except:
     duplicates = {}
@@ -235,13 +240,8 @@ for article in article_list:
             duplicates[article.article_id] = 1
             article.article_id += "-1"
 
-
-data_dir = os.path.abspath(os.path.join(
-    os.path.dirname(__file__), '..', 'data'))
-file_path = os.path.join(data_dir, 'duplicates.json')
-
 try:
-    with open(file_path, 'w') as file:
+    with open(os.path.join(data_dir, 'duplicates.json'), 'w') as file:
         json.dump(duplicates, file, ensure_ascii=False, indent=4)
     logger.info(
         "Duplicates data has been successfully written to 'duplicates.json'.")
@@ -258,7 +258,7 @@ if article_list:
     save_to_database(article_list)
     for article in tqdm.tqdm(article_list, desc="Saving to directory..."):
         if article.text != "" and article.category != "N1 Studio uživo":
-            directory = os.path.join("../data_temp", article.date)
+            directory = os.path.join(data_dir, '../data_temp', article.date)
             create_directory_if_not_exists(directory)
             file_name = f"{article.article_id}.json"
             file_path = os.path.join(directory, file_name)

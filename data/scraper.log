@@ -79,3 +79,11 @@ INFO:__main__:Duplicates data has been successfully written to 'duplicates.json'
 INFO:__main__:Last scraped datetime saved successfully.
 INFO:__main__:Processing and saving the scraped articles...
 INFO:__main__:Articles data successfully written to JSON file.
+INFO:__main__:Started scraper at 14:53:37 10/06/2024
+INFO:__main__:Fetching articles from page 1...
+INFO:__main__:API URL: https://n1info.hr/wp-json/wp/v2/uc-all-posts, Parameters: {'per_page': 10, 'page': 1}
+INFO:__main__:Stopping the loop as article datetime is older than or equal to last scraped datetime.
+INFO:__main__:Duplicates data has been successfully written to 'duplicates.json'.
+INFO:__main__:Last scraped datetime saved successfully.
+INFO:__main__:Processing and saving the scraped articles...
+INFO:__main__:Articles data successfully written to JSON file.
