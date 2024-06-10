@@ -24,9 +24,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run clean_data script
-        run: python scraper/clean_data.py
-
       - name: Run initialize_data script
         run: python scraper/initialize_data.py
 
