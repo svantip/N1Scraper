@@ -1,0 +1,34 @@
+name: Initial Setup
+
+on:
+  push:
+    branches:
+      - main  # or any other branch you use
+  workflow_dispatch:  # Allows manual trigger
+
+jobs:
+  run_initial_setup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.11.9'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run clean_data script
+        run: python scraper/clean_data.py
+
+      - name: Run initialize_data script
+        run: python scraper/initialize_data.py
+
+      - name: Echo job status
+        run: echo "Initial setup job status is ${{ job.status }}."
