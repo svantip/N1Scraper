@@ -16,7 +16,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v2
         with:
-          python-version: '3.11.9'  
+          python-version: '3.11.9'
 
       - name: Install dependencies
         run: |
@@ -25,12 +25,12 @@ jobs:
 
       - name: Create data directories and files
         run: |
-          mkdir -p data
-          touch data/scraper.log
-          mkdir -p data_temp
-          touch data/last_scraped_datetime.txt
-          touch data/duplicates.json
-          echo "{}" > data/duplicates.json
+          mkdir -p ./data
+          touch ./data/scraper.log
+          mkdir -p ./data_temp
+          touch ./data/last_scraped_datetime.txt
+          touch ./data/duplicates.json
+          echo "{}" > ./data/duplicates.json
 
       - name: Run scraper script
         run: python scraper/n1_scraper.py
