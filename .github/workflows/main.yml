@@ -23,10 +23,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Create data directories
+      - name: Create data directories and files
         run: |
           mkdir -p data
+          touch data/scraper.log
           mkdir -p data_temp
+          touch data/last_scraped_datetime.txt
+          touch data/duplicates.json
+          echo "{}" > data/duplicates.json
 
       - name: Run scraper script
         run: python scraper/n1_scraper.py
