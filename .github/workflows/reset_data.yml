@@ -1,9 +1,6 @@
 name: Initial Setup
 
 on:
-  push:
-    branches:
-      - main  # or any other branch you use
   workflow_dispatch:  # Allows manual trigger
 
 jobs:
