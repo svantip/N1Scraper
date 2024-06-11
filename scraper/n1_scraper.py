@@ -168,6 +168,7 @@ def get_text_from_article(article_source):
         modified_text = modified_text.replace('N1', '')
         modified_text = modified_text.replace('via REUTERS', '')
         modified_text = modified_text.replace('/', '')
+        modified_text = modified_text.lstrip()
         return modified_text
     except Exception as e:
         logger.error(f"Error occurred while parsing article: {e}")
