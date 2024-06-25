@@ -32,3 +32,11 @@ jobs:
 
       - name: Echo job status
         run: echo "Daily scraper job status is ${{ job.status }}."
+
+      - name: Push to GH
+        run: | 
+          cd /home/milky/N1Scraper/
+          git add data/articles.db data/last_scraped_datetime.txt data/duplicates.json 
+          git commit -m "data_update"
+          git push origin main
+  
