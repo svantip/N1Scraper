@@ -37,6 +37,7 @@ jobs:
         run: | 
           cd /home/milky/N1Scraper/
           git config url."https://oauth2:${{ secrets.GH_TOKEN }}@github.com".insteadOf https://github.com
+          git pull origin main
           git add data/articles.db data/last_scraped_datetime.txt data/duplicates.json 
           git commit -m "data_update"
           git push origin main
