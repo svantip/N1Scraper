@@ -228,18 +228,24 @@ print("Starting scraper...                                   ", end="\r")
 article_list = collect_articles_from_api(
     base_url, params, last_scraped_datetime)
 
+# Load IDs and duplicates
 ids = load_ids()
 
+# Ensure unique IDs in the current article list
+unique_ids = set()
+
 for article in article_list:
-    if article.article_id in ids:
-        if article.article_id in duplicates:
-            counter = duplicates[article.article_id] + 1
-            article.article_id += ("-" + str(counter))
-            a_id = article.article_id.split("-")[0]
-            duplicates[a_id] = counter
+    base_article_id = article.article_id
+    if base_article_id in ids or base_article_id in unique_ids:
+        if base_article_id in duplicates:
+            counter = duplicates[base_article_id] + 1
+            article.article_id = f"{base_article_id}-{counter}"
+            duplicates[base_article_id] = counter
         else:
-            duplicates[article.article_id] = 1
-            article.article_id += "-1"
+            duplicates[base_article_id] = 1
+            article.article_id = f"{base_article_id}-1"
+    unique_ids.add(article.article_id)
+    ids[article.article_id] = None
 
 try:
     with open(os.path.join(data_dir, 'duplicates.json'), 'w') as file:
