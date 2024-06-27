@@ -76,7 +76,8 @@ current_datetime = datetime.datetime.now()
 previous_two_days_datetime = current_datetime - datetime.timedelta(days=2)
 last_scraped_datetime = previous_two_days_datetime
 logger.info(datetime.datetime.isoformat(last_scraped_datetime))
-save_last_scraped_datetime(last_scraped_datetime)
+specified_date = datetime.datetime(2024, 1, 1)
+save_last_scraped_datetime(specified_date)
 
 # Truncate duplicates file
 with open(duplicates_file, 'w') as file:
