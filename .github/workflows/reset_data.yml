@@ -5,7 +5,7 @@ on:
 
 jobs:
   run_initial_setup:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
        - name: Install dependencies
