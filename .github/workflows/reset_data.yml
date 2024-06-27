@@ -8,21 +8,26 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
+       - name: Install dependencies
+         run: |
+            source /home/milky/Envs/n1_scraper/bin/activate
+            pip install -r /home/milky/N1Scraper/requirements.txt
 
-      - name: Set up Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: '3.11.9'
+       - name: Create data directories
+         run: |
+            mkdir -p /home/milky/N1Scraper/data_temp
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+       - name: Run scraper script
+         run: python /home/milky/N1Scraper/scraper/initialize_data.py
 
-      - name: Run initialize_data script
-        run: python scraper/initialize_data.py
+       - name: Echo job status
+         run: echo "Daily scraper job status is ${{ job.status }}."
 
-      - name: Echo job status
-        run: echo "Initial setup job status is ${{ job.status }}."
+       - name: Push to GH
+         run: | 
+            cd /home/milky/N1Scraper/
+            git config url."https://oauth2:${{ secrets.GH_TOKEN }}@github.com".insteadOf https://github.com
+            git pull origin main
+            git add data/articles.db data/last_scraped_datetime.txt data/duplicates.json 
+            git commit -m "data_update"
+            git push origin main
