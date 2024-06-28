@@ -6,6 +6,7 @@ on:
 jobs:
   run_initial_setup:
     runs-on: self-hosted
+    timeout-minutes: 14400
 
     steps:
        - name: Install dependencies
