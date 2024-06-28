@@ -8,6 +8,7 @@ on:
 jobs:
   run_daily_scraper:
     runs-on: self-hosted
+    timeout-minutes: 14400
 
     steps:
       # - name: Checkout repository
