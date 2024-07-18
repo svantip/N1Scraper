@@ -5,3 +5,7 @@ requests
 requests-file>=2.0, <3.0
 docker>=7.0,<8.0
 lxml[html_clean]
+fastapi
+fastapi-cli
+SQLAlchemy
+uvicorn
